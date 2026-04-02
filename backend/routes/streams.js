@@ -63,8 +63,9 @@ router.post("/", auth, async (req, res) => {
 // PUT update stream (admin only)
 router.put("/:id", auth, async (req, res) => {
   try {
+    // Admin panel usually sends the 24-char MongoDB _id for updates
     const stream = await Stream.findByIdAndUpdate(
-      req.params.id,
+      req.params.id, 
       req.body,
       { new: true, runValidators: true }
     );
@@ -76,10 +77,12 @@ router.put("/:id", auth, async (req, res) => {
 });
 
 // DELETE stream (admin only)
-router.delete("/:id", auth, async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
-    await Stream.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: "Stream deleted" });
+    // req.params.id now refers to the matchId from the URL
+    const stream = await Stream.findOne({ matchId: req.params.id }); 
+    if (!stream) return res.status(404).json({ error: "Stream not found" });
+    res.json(stream);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
