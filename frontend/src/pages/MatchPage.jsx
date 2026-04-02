@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 
+const BASE = import.meta.env.VITE_API_URL || "";
+
 const s = {
   page: { maxWidth: 900, margin: "0 auto", padding: "2rem 1.5rem" },
   back: {
@@ -66,7 +68,7 @@ export default function MatchPage() {
   const [loading, setLoad]  = useState(true);
 
   useEffect(() => {
-    axios.get(`/api/cricket/score/${id}`)
+    axios.get(`${BASE}/api/cricket/score/${id}`)
       .then((r) => setData(r.data?.data))
       .catch(() => {})
       .finally(() => setLoad(false));

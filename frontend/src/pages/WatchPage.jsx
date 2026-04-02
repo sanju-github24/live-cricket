@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 
+const BASE = import.meta.env.VITE_API_URL || "";
+
 const s = {
   page: { maxWidth: 1200, margin: "0 auto", padding: "1.5rem" },
   back: {
@@ -69,8 +71,8 @@ export default function WatchPage() {
   // Load stream info + initial score
   useEffect(() => {
     Promise.all([
-      axios.get(`/api/streams/${id}`).catch(() => null),
-      axios.get(`/api/cricket/score/${id}`).catch(() => null),
+      axios.get(`${BASE}/api/streams/${id}`).catch(() => null),
+      axios.get(`${BASE}/api/cricket/score/${id}`).catch(() => null),
     ]).then(([sRes, cRes]) => {
       setStream(sRes?.data);
       setScore(cRes?.data?.data);
@@ -81,7 +83,7 @@ export default function WatchPage() {
   // Poll score every 15s
   useEffect(() => {
     const t = setInterval(() => {
-      axios.get(`/api/cricket/score/${id}`)
+      axios.get(`${BASE}/api/cricket/score/${id}`)
         .then((r) => setScore(r.data?.data))
         .catch(() => {});
     }, 15000);

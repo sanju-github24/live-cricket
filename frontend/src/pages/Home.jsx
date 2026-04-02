@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import MatchCard from "../components/MatchCard";
 
+const BASE = import.meta.env.VITE_API_URL || "";
+
 const s = {
   page: { maxWidth: 1200, margin: "0 auto", padding: "2rem 1.5rem" },
   hero: {
@@ -47,20 +49,36 @@ const s = {
     borderRadius: 10, padding: "1rem 1.5rem", color: "#ff6b6b",
     marginBottom: "1.5rem", fontSize: ".9rem",
   },
-  // Stream card — admin uploaded
   streamCard: {
     background: "var(--card)",
     border: "1px solid rgba(0,230,118,0.25)",
-    borderRadius: 12, padding: "1.2rem 1.4rem",
+    borderRadius: 12,
+    overflow: "hidden",
     animation: "fadeIn .4s ease both",
-    position: "relative", overflow: "hidden",
-    cursor: "pointer", transition: "all .2s",
+    position: "relative",
+    cursor: "pointer",
+    transition: "transform .2s, box-shadow .2s",
   },
   streamGlow: {
     position: "absolute", top: 0, left: 0, right: 0,
-    height: 2,
+    height: 2, zIndex: 1,
     background: "linear-gradient(90deg,#00e676,#00bcd4)",
   },
+  thumbnail: {
+    width: "100%", aspectRatio: "16/9",
+    objectFit: "cover", display: "block",
+  },
+  thumbnailPlaceholder: {
+    width: "100%", aspectRatio: "16/9",
+    background: "linear-gradient(135deg, #0a1628 0%, #0d2137 50%, #091420 100%)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: "3rem", position: "relative", overflow: "hidden",
+  },
+  thumbnailOverlay: {
+    position: "absolute", inset: 0,
+    background: "radial-gradient(ellipse at center, rgba(0,230,118,0.06) 0%, transparent 70%)",
+  },
+  cardBody: { padding: "1rem 1.2rem 1.2rem" },
   streamBadge: {
     display: "inline-flex", alignItems: "center", gap: 5,
     background: "rgba(0,230,118,0.15)", color: "var(--accent)",
@@ -83,32 +101,74 @@ const s = {
   },
 };
 
-// Card for admin-uploaded streams
 function StreamCard({ stream }) {
   const handleWatch = () => {
     window.location.href = `/watch/${stream.matchId}`;
   };
 
   return (
-    <div style={s.streamCard} onClick={handleWatch}>
+    <div
+      style={s.streamCard}
+      onClick={handleWatch}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,230,118,0.12)";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "none";
+      }}
+    >
       <div style={s.streamGlow} />
-      <div style={s.streamBadge}>
-        <span style={s.liveDot} />
-        {stream.isLive ? "LIVE NOW" : "STREAM AVAILABLE"}
+
+      {/* Thumbnail or placeholder */}
+      {stream.thumbnail ? (
+        <img
+          src={stream.thumbnail}
+          alt={stream.matchName}
+          style={s.thumbnail}
+          onError={(e) => {
+            // If image fails, swap to placeholder div
+            e.target.replaceWith((() => {
+              const d = document.createElement("div");
+              d.style.cssText = "width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,#0a1628,#0d2137);display:flex;align-items:center;justify-content:center;font-size:3rem";
+              d.textContent = "🏏";
+              return d;
+            })());
+          }}
+        />
+      ) : (
+        <div style={s.thumbnailPlaceholder}>
+          <div style={s.thumbnailOverlay} />
+          <span style={{ position: "relative", zIndex: 1 }}>🏏</span>
+        </div>
+      )}
+
+      {/* Card body */}
+      <div style={s.cardBody}>
+        <div style={s.streamBadge}>
+          <span style={s.liveDot} />
+          {stream.isLive ? "LIVE NOW" : "STREAM AVAILABLE"}
+        </div>
+        <div style={s.streamTeams}>
+          {stream.team1}
+          <span style={s.streamVs}>vs</span>
+          {stream.team2}
+        </div>
+        <div style={s.streamMeta}>
+          {stream.tournament && <span>{stream.tournament} · </span>}
+          <span>{stream.matchFormat}</span>
+          {stream.matchName && <span> · {stream.matchName}</span>}
+        </div>
+        <button
+          style={s.watchBtn}
+          onClick={(e) => { e.stopPropagation(); handleWatch(); }}
+          onMouseEnter={e => e.currentTarget.style.opacity = ".85"}
+          onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+        >
+          ▶ Watch Stream
+        </button>
       </div>
-      <div style={s.streamTeams}>
-        {stream.team1}
-        <span style={s.streamVs}>vs</span>
-        {stream.team2}
-      </div>
-      <div style={s.streamMeta}>
-        {stream.tournament && <span>{stream.tournament} · </span>}
-        <span>{stream.matchFormat}</span>
-        {stream.matchName && <span> · {stream.matchName}</span>}
-      </div>
-      <button style={s.watchBtn} onClick={handleWatch}>
-        ▶ Watch Stream
-      </button>
     </div>
   );
 }
@@ -122,16 +182,12 @@ export default function Home() {
   useEffect(() => {
     const load = async () => {
       try {
-        // Always load streams from admin — these are guaranteed to work
-        const sRes = await axios.get("/api/streams");
+        const sRes = await axios.get(`${BASE}/api/streams`);
         setStreams(sRes.data || []);
-
-        // Try cricket API for scores — non-critical, may fail if no API key
         try {
-          const mRes = await axios.get("/api/cricket/matches");
+          const mRes = await axios.get(`${BASE}/api/cricket/matches`);
           setMatches(mRes.data?.data || []);
         } catch {
-          // Cricket API failed (no key etc.) — streams still show fine
           setMatches([]);
         }
       } catch (e) {
@@ -146,15 +202,10 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  // Streams uploaded by admin
   const liveStreams    = streams.filter(s => s.isLive);
   const offlineStreams = streams.filter(s => !s.isLive);
-
-  // Match IDs that already have an admin stream
   const streamMatchIds = new Set(streams.map(s => s.matchId));
 
-  // Cricket API matches — only show ones that DON'T have an admin stream
-  // (avoid duplicates — admin stream card is better than a plain match card)
   const liveApiMatches = matches.filter(m =>
     !streamMatchIds.has(m.id) &&
     (m.status?.toLowerCase().includes("live") || m.status?.toLowerCase().includes("progress"))
@@ -176,66 +227,49 @@ export default function Home() {
 
       {error && <div style={s.error}>⚠ {error}</div>}
 
-      {/* ── ADMIN UPLOADED LIVE STREAMS (shown first) ── */}
       {liveStreams.length > 0 && (
         <div style={s.section}>
           <div style={s.sectionTitle}>
             <span style={s.dot} /> Live Streams ({liveStreams.length})
           </div>
           <div style={s.grid}>
-            {liveStreams.map(st => (
-              <StreamCard key={st._id} stream={st} />
-            ))}
+            {liveStreams.map(st => <StreamCard key={st._id} stream={st} />)}
           </div>
         </div>
       )}
 
-      {/* ── LIVE FROM CRICKET API (no admin stream yet) ── */}
       {liveApiMatches.length > 0 && (
         <div style={s.section}>
           <div style={s.sectionTitle}>
             <span style={s.dot} /> Live Matches ({liveApiMatches.length})
           </div>
           <div style={s.grid}>
-            {liveApiMatches.map(m => (
-              <MatchCard key={m.id} match={m} hasStream={false} />
-            ))}
+            {liveApiMatches.map(m => <MatchCard key={m.id} match={m} hasStream={false} />)}
           </div>
         </div>
       )}
 
-      {/* ── NOTHING LIVE ── */}
       {liveStreams.length === 0 && liveApiMatches.length === 0 && (
         <div style={s.section}>
-          <div style={s.sectionTitle}>
-            <span style={s.dot} /> Live Now
-          </div>
-          <div style={s.empty}>
-            No live streams right now. Check back soon! 🏏
-          </div>
+          <div style={s.sectionTitle}><span style={s.dot} /> Live Now</div>
+          <div style={s.empty}>No live streams right now. Check back soon! 🏏</div>
         </div>
       )}
 
-      {/* ── OFFLINE STREAMS (admin uploaded, not live) ── */}
       {offlineStreams.length > 0 && (
         <div style={s.section}>
           <div style={s.sectionTitle}>Available Streams</div>
           <div style={s.grid}>
-            {offlineStreams.map(st => (
-              <StreamCard key={st._id} stream={st} />
-            ))}
+            {offlineStreams.map(st => <StreamCard key={st._id} stream={st} />)}
           </div>
         </div>
       )}
 
-      {/* ── UPCOMING FROM CRICKET API ── */}
       {upcomingMatches.length > 0 && (
         <div style={s.section}>
           <div style={s.sectionTitle}>Upcoming Matches</div>
           <div style={s.grid}>
-            {upcomingMatches.slice(0, 6).map(m => (
-              <MatchCard key={m.id} match={m} hasStream={false} />
-            ))}
+            {upcomingMatches.slice(0, 6).map(m => <MatchCard key={m.id} match={m} hasStream={false} />)}
           </div>
         </div>
       )}

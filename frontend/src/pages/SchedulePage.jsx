@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+const BASE = import.meta.env.VITE_API_URL || "";
+
 const s = {
   page: { maxWidth: 900, margin: "0 auto", padding: "2rem 1.5rem" },
   title: {
@@ -37,7 +39,7 @@ export default function SchedulePage() {
   const nav = useNavigate();
 
   useEffect(() => {
-    axios.get("/api/cricket/matches")
+    axios.get(`${BASE}/api/cricket/matches`)
       .then((r) => setMatches(r.data?.data || []))
       .finally(() => setLoad(false));
   }, []);
